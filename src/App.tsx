@@ -4,8 +4,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { GoogleGenAI } from "@google/genai";
-import { 
+import {
   Activity, 
   Search, 
   AlertTriangle, 
@@ -52,52 +51,6 @@ interface ReportData {
   raw: string;
 }
 
-const SYSTEM_PROMPT = `You are ProductPulse — an AI-powered Consumer Intelligence Engine.
-Analyze up to 50 Amazon reviews (or a product URL) and generate a high-fidelity intelligence report.
-
-If only a URL is provided, try to identify the product from the URL segments and provide a theoretical consensus based on your internal knowledge of that product's general reception, but lower the Confidence Score to reflect this.
-
-==================================================
-MANDATORY OUTPUT FORMAT (USE THIS EXACT STRUCTURE)
-==================================================
-─────────────────────────────────────
-PRODUCTPULSE // INTELLIGENCE REPORT
-Product: [Full product name]
-ASIN: [ASIN]
-Price: [Price]
-Reviews Analyzed: [Count]
-Generated: [Date]
-─────────────────────────────────────
-
-Sentiment: [Very Positive / Positive / Mixed / Polarized / Negative]
-Consensus Strength: [Strong / Moderate / Weak]
-Confidence Score: [0-100] (CRITICAL: MUST INCLUDE THIS LINE)
-
-👍 XX% [Praise]
-⚠️ XX% [Warning]
-😐 XX% [Issue]
-❌ XX% [Failure]
-
-🛒 XX% recommend | [Buy / Mixed / Avoid]
-
-🧠 Emotional Core: "[Theme]"
-   → [Explanation]
-
-📦 Logistics Issues: [Ignore / Minor / Significant]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-BUYER TRUTH (5-LINE SIGNAL STACK)
-① [Finding 1]
-② [Finding 2]
-③ [Finding 3]
-④ [Finding 4]
-⑤ [Finding 5]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-FINAL VERDICT: [Verdict] — [Reason]
-
-STRICT: Use compact, factual, noun-heavy phrasing. Zero hallucination regarding specific buyer stories unless repeated in reviews.`;
-
 export default function App() {
   const [reviews, setReviews] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -113,19 +66,18 @@ export default function App() {
     setReport(null);
 
     try {
-      const isUrl = reviews.trim().split('\n').length === 1 && reviews.trim().match(/^https?:\/\//);
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const promptSuffix = isUrl ? "\n\n(Note: A URL was provided. Please infer the product details and general consensus from your internal knowledge base if direct review text is missing.)" : "";
-      
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Analyze these reviews and provide the ProductPulse Intelligence Report:\n\n${reviews}${promptSuffix}`,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-        }
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviews }),
       });
 
-      const text = response.text || '';
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const text: string = data.text || '';
       const parsedReport = parseReport(text);
       setReport(parsedReport);
       
